@@ -6,11 +6,19 @@ Baybay Leyte Pigeon Federation - A web-based clocking system for tracking Pigeon
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baybay Leyte Pigeon Tracker</title>
-<meta name="description" content="Track pigeon ring numbers, stickers, and time, synced with friends.">
+<meta name="description" content="Track pigeon ring numbers, stickers, and time, synced with friends in real-time.">
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
+  input { margin: 5px 0; padding: 5px; width: 100%; }
+  button { padding: 10px; margin-top: 10px; width: 100%; cursor: pointer; }
+  table { width: 100%; margin-top: 20px; border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: 5px; text-align: left; }
+</style>
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 </head>
 <body>
+
 <h1>Baybay Leyte Pigeon Tracker</h1>
 
 <div>
@@ -31,16 +39,31 @@ Baybay Leyte Pigeon Federation - A web-based clocking system for tracking Pigeon
 <button onclick="submitData()">Submit</button>
 
 <h2>Submitted Records</h2>
-<ul id="records"></ul>
+<table id="recordsTable">
+  <thead>
+    <tr>
+      <th>Ring Number</th>
+      <th>Sticker</th>
+      <th>Time</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
 <script>
-// Firebase config
+// ===== Your Firebase config =====
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
+  apiKey: "AIzaSyC3oLOFmn3OdYAdcSsHTWV4kQnejV8gx-0",
+  authDomain: "blpf-pigeon-tracker.firebaseapp.com",
+  databaseURL: "https://blpf-pigeon-tracker-default-rtdb.firebaseio.com",
+  projectId: "blpf-pigeon-tracker",
+  storageBucket: "blpf-pigeon-tracker.appspot.com",
+  messagingSenderId: "203553095076",
+  appId: "1:203553095076:web:67d73be281ff39dff45531"
 };
+// ===============================
+
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -54,8 +77,8 @@ updateTime();
 
 // Submit data to Firebase
 function submitData() {
-  const ring = document.getElementById('ringNumber').value;
-  const sticker = document.getElementById('sticker').value;
+  const ring = document.getElementById('ringNumber').value.trim();
+  const sticker = document.getElementById('sticker').value.trim();
   const time = document.getElementById('time').value;
 
   if (!ring || !sticker) {
@@ -73,15 +96,16 @@ function submitData() {
 // Listen for changes in Firebase
 db.ref('pigeons').on('value', snapshot => {
   const records = snapshot.val();
-  const ul = document.getElementById('records');
-  ul.innerHTML = '';
+  const tbody = document.querySelector('#recordsTable tbody');
+  tbody.innerHTML = '';
   for (let key in records) {
     const r = records[key];
-    const li = document.createElement('li');
-    li.textContent = `Ring: ${r.ring} | Sticker: ${r.sticker} | Time: ${r.time}`;
-    ul.appendChild(li);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.ring}</td><td>${r.sticker}</td><td>${r.time}</td>`;
+    tbody.appendChild(tr);
   }
 });
 </script>
+
 </body>
 </html>
