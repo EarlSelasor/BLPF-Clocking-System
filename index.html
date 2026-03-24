@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Baybay Leyte Pigeon Tracker</title>
-<meta name="description" content="Track pigeon ring numbers, stickers, and time, synced with friends in real-time.">
+<meta name="description" content="Track pigeon ring numbers, stickers, time, release point, loft, distance, and speed, synced live.">
 <style>
-  body { font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; }
-  input { margin: 5px 0; padding: 5px; width: 100%; }
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; }
+  input, select { margin: 5px 0; padding: 5px; width: 100%; }
   button { padding: 10px; margin-top: 10px; width: 100%; cursor: pointer; }
   table { width: 100%; margin-top: 20px; border-collapse: collapse; }
   th, td { border: 1px solid #ccc; padding: 5px; text-align: left; }
@@ -30,7 +30,28 @@
 </div>
 
 <div>
-  <label>Time:</label>
+  <label>Release Point (lat,lng):</label>
+  <input type="text" id="releaseLat" placeholder="Latitude">
+  <input type="text" id="releaseLng" placeholder="Longitude">
+</div>
+
+<div>
+  <label>Your Loft:</label>
+  <select id="loft">
+    <option value="Loft1">Loft1</option>
+    <option value="Loft2">Loft2</option>
+    <option value="Loft3">Loft3</option>
+    <!-- Add friends lofts here -->
+  </select>
+</div>
+
+<div>
+  <label>Arrival Time:</label>
+  <input type="text" id="arrivalTime" readonly>
+</div>
+
+<div>
+  <label>Current Time:</label>
   <input type="text" id="time" readonly>
 </div>
 
@@ -42,14 +63,19 @@
     <tr>
       <th>Ring Number</th>
       <th>Sticker</th>
-      <th>Time</th>
+      <th>Release Point</th>
+      <th>Loft</th>
+      <th>Release Time</th>
+      <th>Arrival Time</th>
+      <th>Distance (km)</th>
+      <th>Speed (km/h)</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
 
 <script>
-// ===== Your Firebase config =====
+// ===== Firebase config =====
 const firebaseConfig = {
   apiKey: "AIzaSyC3oLOFmn3OdYAdcSsHTWV4kQnejV8gx-0",
   authDomain: "blpf-pigeon-tracker.firebaseapp.com",
@@ -59,36 +85,68 @@ const firebaseConfig = {
   messagingSenderId: "203553095076",
   appId: "1:203553095076:web:67d73be281ff39dff45531"
 };
-// ===============================
-
-// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Auto-fill current time
+// Auto-fill current time and arrival time
 function updateTime() {
   const now = new Date();
-  document.getElementById('time').value = now.toLocaleTimeString();
+  const timeString = now.toLocaleTimeString();
+  document.getElementById('time').value = timeString;
+  document.getElementById('arrivalTime').value = now.toISOString(); // full timestamp for calculation
 }
 setInterval(updateTime, 1000);
 updateTime();
+
+// Haversine formula for distance in km
+function getDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // radius of Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
 
 // Submit data to Firebase
 function submitData() {
   const ring = document.getElementById('ringNumber').value.trim();
   const sticker = document.getElementById('sticker').value.trim();
-  const time = document.getElementById('time').value;
+  const releaseLat = parseFloat(document.getElementById('releaseLat').value.trim());
+  const releaseLng = parseFloat(document.getElementById('releaseLng').value.trim());
+  const loft = document.getElementById('loft').value;
+  const releaseTime = document.getElementById('time').value;
+  const arrivalTime = document.getElementById('arrivalTime').value;
 
-  if (!ring || !sticker) {
-    alert("Please enter ring number and sticker info!");
+  if (!ring || !sticker || isNaN(releaseLat) || isNaN(releaseLng)) {
+    alert("Please enter ring number, sticker, and valid release coordinates!");
     return;
   }
 
-  const record = { ring, sticker, time };
+  // Loft coordinates (example, you can update with real coordinates)
+  const loftCoords = {
+    "Loft1": {lat: 11.251, lng: 124.945},
+    "Loft2": {lat: 11.252, lng: 124.946},
+    "Loft3": {lat: 11.253, lng: 124.947}
+  };
+  const loftLat = loftCoords[loft].lat;
+  const loftLng = loftCoords[loft].lng;
+
+  const distanceKm = getDistanceKm(releaseLat, releaseLng, loftLat, loftLng);
+  const timeDiffHours = (new Date(arrivalTime) - new Date(new Date().toDateString() + ' ' + releaseTime)) / 3600000;
+  const speedKmh = (timeDiffHours > 0) ? (distanceKm / timeDiffHours).toFixed(2) : 0;
+
+  const record = {
+    ring, sticker, releaseLat, releaseLng, loft,
+    releaseTime, arrivalTime, distanceKm: distanceKm.toFixed(2), speedKmh
+  };
+
   db.ref('pigeons').push(record);
 
   document.getElementById('ringNumber').value = '';
   document.getElementById('sticker').value = '';
+  document.getElementById('releaseLat').value = '';
+  document.getElementById('releaseLng').value = '';
 }
 
 // Listen for changes in Firebase
@@ -99,7 +157,7 @@ db.ref('pigeons').on('value', snapshot => {
   for (let key in records) {
     const r = records[key];
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.ring}</td><td>${r.sticker}</td><td>${r.time}</td>`;
+    tr.innerHTML = `<td>${r.ring}</td><td>${r.sticker}</td><td>${r.releaseLat}, ${r.releaseLng}</td><td>${r.loft}</td><td>${r.releaseTime}</td><td>${r.arrivalTime}</td><td>${r.distanceKm}</td><td>${r.speedKmh}</td>`;
     tbody.appendChild(tr);
   }
 });
